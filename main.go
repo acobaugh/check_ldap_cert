@@ -4,24 +4,27 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"gopkg.in/ldap.v3"
+	//"net"
 	"net/url"
 	"os"
 	"time"
-	"gopkg.in/ldap.v3"
 )
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Printf("Usage: %s <host[:port]>\n", os.Args[0])
+		fmt.Printf("Usage: %s ldap://<host[:port]>\n", os.Args[0])
 		os.Exit(1)
 	}
 
+	// parse url
 	u, err := url.Parse(os.Args[1])
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	// create addr
 	host := u.Hostname()
 	port := u.Port()
 	if port == "" {
@@ -29,27 +32,49 @@ func main() {
 	}
 	addr := fmt.Sprintf("%s:%s", host, port)
 
+	// create ldap connection
 	l, err := ldap.Dial("tcp", addr)
 	if err != nil {
-		fmt.Printf("%s", err)
+		fmt.Printf("net.Dial(): %s\n", err)
 		os.Exit(1)
 	}
 	defer l.Close()
 
-	tlsConf := tls.Config{}
-	tlsConf.InsecureSkipVerify = false
-	tlsConf.ServerName = host
+	// set up tls.Config{}
+	tlsConf := tls.Config{
+		InsecureSkipVerify: true,
+		ServerName:         host,
+	}
 
+	// initiate starttls
 	err = l.StartTLS(&tlsConf)
 	if err != nil {
-		fmt.Printf("%s", err)
+		fmt.Printf("ldap.StartTLS(): %s\n", err)
 		os.Exit(1)
 	}
 
-	cs := l.ConnectionState()
+	cs, ok := l.TLSConnectionState()
+	if !ok {
+		fmt.Print("ConnectionState not ok\n")
+		os.Exit(1)
+	}
 
-	for cert := range cs.PeerCertificates() {
-		fmt.Printf("Subject: %s | Issuer: %s | Expires(days): %i\n", cert.Subject, cert.Issuer, expiresIn(cert))
+	for i, cert := range cs.PeerCertificates {
+		fmt.Printf(" %d s:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n",
+			i, cert.Subject.Country,
+			cert.Subject.Province,
+			cert.Subject.Locality,
+			cert.Subject.Organization,
+			cert.Subject.OrganizationalUnit,
+			cert.Subject.CommonName)
+		fmt.Printf("   i:/C=%v/ST=%v/L=%v/O=%v/OU=%v/CN=%s\n",
+			cert.Issuer.Country,
+			cert.Issuer.Province,
+			cert.Issuer.Locality,
+			cert.Issuer.Organization,
+			cert.Issuer.OrganizationalUnit,
+			cert.Issuer.CommonName)
+		fmt.Printf("   expires: %s\n", cert.NotAfter)
 	}
 }
 
