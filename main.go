@@ -74,7 +74,22 @@ func main() {
 			cert.Issuer.Organization,
 			cert.Issuer.OrganizationalUnit,
 			cert.Issuer.CommonName)
-		fmt.Printf("   expires: %s\n", cert.NotAfter)
+		fmt.Printf("   validity: NotBefore: %s, NotAfter: %s\n", cert.NotBefore, cert.NotAfter)
+		fmt.Printf("   serial: %x\n", cert.SerialNumber)
+		fmt.Print("   subjectAltName: ")
+		for _, san := range cert.DNSNames {
+			fmt.Printf("DNS: %s, ", san)
+		}
+		for san := range cert.EmailAddresses {
+			fmt.Printf("Email: %s, ", san)
+		}
+		for san := range cert.IPAddresses {
+			fmt.Printf("IP: %s, ", san)
+		}
+		for san := range cert.URIs {
+			fmt.Printf("URI: %s, ", san)
+		}
+		fmt.Println()
 	}
 }
 
